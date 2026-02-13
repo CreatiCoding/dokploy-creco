@@ -1,0 +1,10 @@
+{
+  "name": "velog-trending-warm",
+  "description": "velog 트렌딩 API 워밍업 - 매일 오전 7시(KST) 호출",
+  "schedule": "0 22 * * *",
+  "timezone": "Asia/Seoul",
+  "command": "./velog-trending-warm.sh",
+  "endpoints": [
+    "https://api.dokploy.creco.dev/velog-trending/week"
+  ]
+}
