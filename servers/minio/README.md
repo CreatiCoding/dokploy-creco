@@ -6,7 +6,10 @@
 
 - **API 포트**: 9000 (S3 API)
 - **콘솔 포트**: 9001 (웹 관리 콘솔)
-- **기본 계정**: `minioadmin` / `minioadmin123`
+- **Production URL**:
+  - API: `https://s3.dokploy.creco.dev`
+  - Console: `https://s3-console.dokploy.creco.dev`
+- **계정**: 환경변수로 관리 (보안상 README에 기재 안함)
 
 ## 🚀 로컬 실행
 
@@ -27,15 +30,15 @@ docker run -p 9000:9000 -p 9001:9001 -v minio-data:/data minio-s3-mock
 ## 📡 S3 SDK 사용 예시
 
 ```javascript
-// AWS SDK v3 사용 예시
+// AWS SDK v3 사용 예시 - Production
 import { S3Client } from "@aws-sdk/client-s3";
 
 const s3Client = new S3Client({
-  endpoint: "http://localhost:9000",
+  endpoint: "https://s3.dokploy.creco.dev",
   region: "us-east-1",
   credentials: {
-    accessKeyId: "minioadmin",
-    secretAccessKey: "minioadmin123",
+    accessKeyId: process.env.MINIO_ROOT_USER,
+    secretAccessKey: process.env.MINIO_ROOT_PASSWORD,
   },
   forcePathStyle: true,
 });
