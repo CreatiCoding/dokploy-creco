@@ -42,6 +42,7 @@ export class ClaudeHandler {
     const options: any = {
       outputFormat: 'stream-json',
       permissionMode: 'bypassPermissions',
+      includePartialMessages: true,
     };
 
     if (workingDirectory) {

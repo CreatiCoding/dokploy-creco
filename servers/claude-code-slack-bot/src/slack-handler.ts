@@ -185,11 +185,33 @@ export class SlackHandler {
     const SLACK_MAX_LENGTH = 39000;
     const threadTs = thread_ts || ts;
 
-    // Helper: build full message text with status header + accumulated content
+    // Streaming state variables
+    let streamingText = '';
+    let streamingThinking = '';
+    let currentBlockType: string | null = null;
+    let hasStreamedText = false;
+    let lastUpdateTime = 0;
+    let updateTimeout: ReturnType<typeof setTimeout> | null = null;
+    const THROTTLE_INTERVAL = 1500; // 1.5초 간격
+
+    // Helper: build full message text with status header + accumulated content + streaming buffers
     const buildResponseText = (statusEmoji: string, statusText: string): string => {
       const header = `${statusEmoji} *${statusText}*`;
-      if (contentParts.length === 0) return header;
-      return `${header}\n\n${contentParts.join('\n\n---\n\n')}`;
+      const parts = [...contentParts];
+
+      // Add current streaming thinking buffer as blockquote
+      if (streamingThinking) {
+        const thinkingLines = streamingThinking.split('\n').map(line => `> 💭 _${line}_`).join('\n');
+        parts.push(thinkingLines);
+      }
+
+      // Add current streaming text buffer with cursor
+      if (streamingText) {
+        parts.push(streamingText + ' ▍');
+      }
+
+      if (parts.length === 0) return header;
+      return `${header}\n\n${parts.join('\n\n---\n\n')}`;
     };
 
     // Helper: update or overflow the response message
@@ -221,6 +243,39 @@ export class SlackHandler {
           text: fullText,
         });
       }
+    };
+
+    // Throttled update: respects rate limits
+    const throttledUpdate = (statusEmoji: string, statusText: string) => {
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateTime;
+
+      if (timeSinceLastUpdate >= THROTTLE_INTERVAL) {
+        // Enough time has passed, update immediately
+        lastUpdateTime = now;
+        updateResponse(statusEmoji, statusText).catch(err =>
+          this.logger.warn('Failed to update streaming message', err)
+        );
+      } else {
+        // Schedule an update after the remaining throttle time
+        if (updateTimeout) clearTimeout(updateTimeout);
+        updateTimeout = setTimeout(() => {
+          lastUpdateTime = Date.now();
+          updateResponse(statusEmoji, statusText).catch(err =>
+            this.logger.warn('Failed to update streaming message', err)
+          );
+        }, THROTTLE_INTERVAL - timeSinceLastUpdate);
+      }
+    };
+
+    // Flush: cancel pending throttle and update immediately
+    const flushUpdate = async (statusEmoji: string, statusText: string) => {
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+        updateTimeout = null;
+      }
+      lastUpdateTime = Date.now();
+      await updateResponse(statusEmoji, statusText);
     };
 
     try {
@@ -255,8 +310,54 @@ export class SlackHandler {
         this.logger.debug('Received message from Claude SDK', {
           type: message.type,
           subtype: (message as any).subtype,
-          message: message,
         });
+
+        // Handle stream_event for real-time streaming
+        if (message.type === 'stream_event') {
+          const event = (message as any).event;
+          if (!event) continue;
+
+          if (event.type === 'content_block_start') {
+            const blockType = event.content_block?.type;
+            currentBlockType = blockType || null;
+            if (blockType === 'thinking') {
+              streamingThinking = '';
+            } else if (blockType === 'text') {
+              streamingText = '';
+            }
+          } else if (event.type === 'content_block_delta') {
+            const delta = event.delta;
+            if (!delta) continue;
+
+            if (delta.type === 'thinking_delta' && delta.thinking) {
+              streamingThinking += delta.thinking;
+              await this.updateMessageReaction(sessionKey, '🤔');
+              throttledUpdate('💭', 'Thinking...');
+            } else if (delta.type === 'text_delta' && delta.text) {
+              streamingText += delta.text;
+              hasStreamedText = true;
+              await this.updateMessageReaction(sessionKey, '⚙️');
+              throttledUpdate('⚙️', 'Working...');
+            }
+          } else if (event.type === 'content_block_stop') {
+            if (currentBlockType === 'thinking' && streamingThinking) {
+              // Finalize thinking block into contentParts
+              const thinkingLines = streamingThinking.split('\n').map(line => `> 💭 _${line}_`).join('\n');
+              contentParts.push(thinkingLines);
+              streamingThinking = '';
+              await flushUpdate('⚙️', 'Working...');
+            } else if (currentBlockType === 'text' && streamingText) {
+              // Finalize text block into contentParts
+              const formatted = this.formatMessage(streamingText, false);
+              contentParts.push(formatted);
+              currentMessages.push(streamingText);
+              streamingText = '';
+              await flushUpdate('⚙️', 'Working...');
+            }
+            currentBlockType = null;
+          }
+          continue;
+        }
 
         if (message.type === 'assistant') {
           const hasToolUse = message.message.content?.some((part: any) => part.type === 'tool_use');
@@ -272,20 +373,25 @@ export class SlackHandler {
               await this.handleTodoUpdate(todoTool.input, sessionKey, session?.sessionId, channel, threadTs, say);
             }
 
-            const toolContent = this.formatToolUse(message.message.content);
+            // Only format tool_use blocks (text was already streamed)
+            const toolContent = this.formatToolUseBlocks(message.message.content);
             if (toolContent) {
               contentParts.push(toolContent);
-              await updateResponse('⚙️', 'Working...');
+              await flushUpdate('⚙️', 'Working...');
             }
-          } else {
+          } else if (!hasStreamedText) {
+            // Only process text from assistant message if not already streamed
             const content = this.extractTextContent(message);
             if (content) {
               currentMessages.push(content);
               const formatted = this.formatMessage(content, false);
               contentParts.push(formatted);
-              await updateResponse('⚙️', 'Working...');
+              await flushUpdate('⚙️', 'Working...');
             }
           }
+
+          // Reset hasStreamedText for next turn
+          hasStreamedText = false;
         } else if (message.type === 'result') {
           this.logger.info('Received result from Claude SDK', {
             subtype: message.subtype,
@@ -333,6 +439,10 @@ export class SlackHandler {
         await this.fileHandler.cleanupTempFiles(processedFiles);
       }
     } finally {
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+        updateTimeout = null;
+      }
       this.activeControllers.delete(sessionKey);
 
       if (session?.sessionId) {
@@ -386,6 +496,40 @@ export class SlackHandler {
             parts.push(this.formatGenericTool(toolName, input));
         }
       }
+    }
+
+    return parts.join('\n\n');
+  }
+
+  private formatToolUseBlocks(content: any[]): string {
+    const parts: string[] = [];
+
+    for (const part of content) {
+      if (part.type === 'tool_use') {
+        const toolName = part.name;
+        const input = part.input;
+
+        switch (toolName) {
+          case 'Edit':
+          case 'MultiEdit':
+            parts.push(this.formatEditTool(toolName, input));
+            break;
+          case 'Write':
+            parts.push(this.formatWriteTool(input));
+            break;
+          case 'Read':
+            parts.push(this.formatReadTool(input));
+            break;
+          case 'Bash':
+            parts.push(this.formatBashTool(input));
+            break;
+          case 'TodoWrite':
+            break; // TodoWrite is handled separately
+          default:
+            parts.push(this.formatGenericTool(toolName, input));
+        }
+      }
+      // Skip text blocks - already handled by streaming
     }
 
     return parts.join('\n\n');
