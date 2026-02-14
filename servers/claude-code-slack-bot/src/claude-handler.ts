@@ -43,6 +43,7 @@ export class ClaudeHandler {
       outputFormat: 'stream-json',
       permissionMode: 'bypassPermissions',
       includePartialMessages: true,
+      abortController: abortController || new AbortController(),
     };
 
     if (workingDirectory) {
@@ -81,7 +82,6 @@ export class ClaudeHandler {
     try {
       for await (const message of query({
         prompt,
-        abortController: abortController || new AbortController(),
         options,
       })) {
         if (message.type === 'system' && message.subtype === 'init') {
