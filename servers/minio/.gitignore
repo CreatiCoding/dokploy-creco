@@ -1,0 +1,16 @@
+# Environment files
+.env
+
+# Data directories
+data/
+minio-data/
+
+# Docker volumes
+volumes/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
