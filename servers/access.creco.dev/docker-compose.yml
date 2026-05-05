@@ -2,29 +2,35 @@ version: '3.8'
 
 services:
   goaccess:
-    build: .
+    image: allinurl/goaccess:latest
     container_name: goaccess-access-log
+    command: >
+      sh -c '
+        LOG=/var/log/traefik/access.log;
+        if [ ! -f "$$LOG" ]; then LOG=/tmp/access.log; fi;
+        if [ ! -s "$$LOG" ]; then
+          echo "127.0.0.1 - - [01/Jan/2024:00:00:00 +0000] \"GET /health HTTP/1.1\" 200 0 \"-\" \"healthcheck\"" > $$LOG;
+        fi;
+        exec goaccess $$LOG
+          --real-time-html
+          --port=7890
+          --ws-url=access.creco.dev:443
+          --output=/srv/report/index.html
+          --log-format=COMBINED
+          --anonymize-ip
+      '
     networks:
       - dokploy-network
-    environment:
-      ACCESS_LOG_PATH: /var/log/traefik/access.log
-      WS_URL: ${WS_URL:-access.creco.dev}
-      GOACCESS_EXTRA_ARGS: ${GOACCESS_EXTRA_ARGS:-}
     volumes:
       - /etc/dokploy/traefik:/var/log/traefik:ro
-      - goaccess_db:/tmp/goaccess-db
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.goaccess.rule=Host(`access.creco.dev`)"
       - "traefik.http.routers.goaccess.entrypoints=websecure"
       - "traefik.http.routers.goaccess.tls.certresolver=letsencrypt"
-      - "traefik.http.services.goaccess.loadbalancer.server.port=80"
+      - "traefik.http.services.goaccess.loadbalancer.server.port=7890"
 
 networks:
   dokploy-network:
     external: true
-
-volumes:
-  goaccess_db:
-    driver: local
