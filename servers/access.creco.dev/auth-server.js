@@ -7,7 +7,14 @@ const USERNAME = process.env.AUTH_USER || 'admin';
 const PASSWORD = process.env.AUTH_PASS || 'ulOsHo5vnu5bJuwq';
 const SECRET = process.env.AUTH_SECRET || crypto.randomBytes(32).toString('hex');
 const COOKIE_NAME = 'goaccess_session';
-const LOG_FILE = process.env.ACCESS_LOG_PATH || '/var/log/traefik/access.log';
+function resolveLogFile() {
+  const candidate = process.env.ACCESS_LOG_PATH || '/var/log/traefik/access.log';
+  try {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+  } catch {}
+  return '/tmp/access.log';
+}
+const LOG_FILE = resolveLogFile();
 
 function makeToken() {
   return crypto.createHmac('sha256', SECRET).update(USERNAME + PASSWORD).digest('hex');
