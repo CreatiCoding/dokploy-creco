@@ -11,7 +11,7 @@ services:
       WS_URL: ${WS_URL:-access.creco.dev}
       GOACCESS_EXTRA_ARGS: ${GOACCESS_EXTRA_ARGS:-}
     volumes:
-      - /etc/dokploy/traefik/access.log:/var/log/traefik/access.log:ro
+      - /etc/dokploy/traefik:/var/log/traefik:ro
       - goaccess_data:/var/www/goaccess
       - goaccess_db:/tmp/goaccess-db
     restart: unless-stopped

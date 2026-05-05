@@ -6,19 +6,16 @@ mkdir -p /tmp/goaccess-db
 
 LOG_FILE="${ACCESS_LOG_PATH:-/var/log/traefik/access.log}"
 
-# Wait for log file to exist (max 60 retries = 5 min)
-echo "Waiting for log file: $LOG_FILE"
-RETRIES=0
-while [ ! -f "$LOG_FILE" ]; do
-  RETRIES=$((RETRIES + 1))
-  if [ $RETRIES -ge 60 ]; then
-    echo "Log file not found after 5 minutes. Creating empty log file to start..."
+# Ensure log file exists
+if [ ! -f "$LOG_FILE" ]; then
+  echo "Log file not found at $LOG_FILE. Creating empty file..."
+  touch "$LOG_FILE" 2>/dev/null || {
+    # If read-only mount, use a writable fallback
+    LOG_FILE="/tmp/access.log"
     touch "$LOG_FILE"
-    break
-  fi
-  sleep 5
-  echo "Log file not found yet, waiting... ($RETRIES/60)"
-done
+    echo "Using fallback log at $LOG_FILE"
+  }
+fi
 
 echo "Starting GoAccess real-time HTML report..."
 
