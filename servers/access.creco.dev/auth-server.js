@@ -270,7 +270,7 @@ function parseUrl(url) {
   if (queryString) {
     queryString.split('&').forEach(p => {
       const [k, v] = p.split('=');
-      if (k) params[decodeURIComponent(k)] = decodeURIComponent(v || '');
+      if (k) params[decodeURIComponent(k.replace(/\+/g, ' '))] = decodeURIComponent((v || '').replace(/\+/g, ' '));
     });
   }
   return { path, params };
