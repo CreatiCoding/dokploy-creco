@@ -23,7 +23,7 @@ exec goaccess "$LOG_FILE" \
   --config-file=/etc/goaccess/goaccess.conf \
   --real-time-html \
   --port=7890 \
-  --ws-url="wss://${WS_URL:-access.creco.dev}/ws" \
+  --ws-url="wss://${WS_URL:-access.creco.dev}:443/ws" \
   --origin="https://${WS_URL:-access.creco.dev}" \
   --output=/var/www/goaccess/index.html \
   --log-format='%h - %^ [%d:%t %^] "%r" %s %b "%R" "%u"' \
