@@ -35,9 +35,36 @@ function isAuthenticated(req) {
   return cookies[COOKIE_NAME] === makeToken();
 }
 
-// Parse a COMBINED log line
+// Parse log line (JSON or COMBINED format)
 function parseLogLine(line) {
-  // Format: %h - %^ [%d:%t %^] "%r" %s %b "%R" "%u"
+  // Try JSON first (Traefik JSON format)
+  if (line.startsWith('{')) {
+    try {
+      const j = JSON.parse(line);
+      const host = j.RequestHost || j.request_Host || '';
+      const path = j.RequestPath || j.request_path || '';
+      const query = j.RequestQuery || '';
+      const scheme = j.RequestScheme || 'https';
+      const url = host ? `${scheme}://${host}${path}${query}` : path;
+      return {
+        ip: j.ClientHost || j.ClientAddr || '',
+        time: j.StartUTC || j.StartLocal || j.time || '',
+        method: j.RequestMethod || '',
+        path: path,
+        url: url,
+        host: host,
+        protocol: j.RequestProtocol || '',
+        status: parseInt(j.OriginStatus || j.DownstreamStatus || 0),
+        size: parseInt(j.OriginContentSize || j.DownstreamContentSize || 0),
+        referer: j.request_Referer || '',
+        userAgent: j.request_User_Agent || j["request_User-Agent"] || '',
+        duration: j.Duration || 0,
+        router: j.RouterName || '',
+        service: j.ServiceName || ''
+      };
+    } catch {}
+  }
+  // Fallback: COMBINED format
   const regex = /^(\S+) - \S+ \[([^\]]+)\] "(\S+) (\S+) ([^"]*)" (\d{3}) (\d+|-) "([^"]*)" "([^"]*)"/;
   const match = line.match(regex);
   if (!match) return null;
@@ -46,6 +73,8 @@ function parseLogLine(line) {
     time: match[2],
     method: match[3],
     path: match[4],
+    url: match[4],
+    host: '',
     protocol: match[5],
     status: parseInt(match[6]),
     size: match[7] === '-' ? 0 : parseInt(match[7]),
@@ -208,6 +237,8 @@ function evaluateKQL(ast, entry) {
       const s = ast.value.toLowerCase();
       return entry.ip.toLowerCase().includes(s) ||
         entry.path.toLowerCase().includes(s) ||
+        (entry.url || '').toLowerCase().includes(s) ||
+        (entry.host || '').toLowerCase().includes(s) ||
         entry.userAgent.toLowerCase().includes(s) ||
         entry.method.toLowerCase().includes(s) ||
         String(entry.status).includes(s);
@@ -219,6 +250,7 @@ function evaluateKQL(ast, entry) {
 function getField(entry, field) {
   if (field === 'status') return entry.status;
   if (field === 'size') return entry.size;
+  if (field === 'duration') return entry.duration || 0;
   return entry[field] || '';
 }
 

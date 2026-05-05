@@ -131,9 +131,6 @@
       font-size: 0.75rem;
       letter-spacing: 0.5px;
       border-bottom: 1px solid #2a2a4a;
-      position: sticky;
-      top: 65px;
-      z-index: 50;
     }
     tbody tr {
       border-bottom: 1px solid #1e1e3a;
@@ -256,7 +253,7 @@
           <th>Time</th>
           <th>IP</th>
           <th>Method</th>
-          <th>Path</th>
+          <th>URL</th>
           <th>Status</th>
           <th>Size</th>
           <th>User Agent</th>
@@ -358,7 +355,7 @@
             <td class="col-time">${escapeHtml(log.time)}</td>
             <td class="col-ip">${escapeHtml(log.ip)}</td>
             <td class="col-method ${log.method}">${escapeHtml(log.method)}</td>
-            <td class="col-path" title="${escapeHtml(log.path)}">${escapeHtml(log.path)}</td>
+            <td class="col-path" title="${escapeHtml(log.url || log.path)}">${escapeHtml(log.url || log.path)}</td>
             <td class="col-status ${statusClass(log.status)}">${log.status}</td>
             <td>${formatSize(log.size)}</td>
             <td class="col-ua" title="${escapeHtml(log.userAgent)}">${escapeHtml(log.userAgent)}</td>
