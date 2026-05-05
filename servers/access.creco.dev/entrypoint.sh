@@ -17,7 +17,7 @@ fi
 echo "Using log file: $LOG_FILE ($(wc -l < "$LOG_FILE") lines)"
 
 # Start GoAccess real-time (WebSocket on 7890, generates HTML)
-/goaccess "$LOG_FILE" \
+goaccess "$LOG_FILE" \
   --real-time-html \
   --port=7890 \
   --ws-url=access.creco.dev:443/ws \
