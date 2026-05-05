@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  goaccess:
+    build: .
+    container_name: goaccess-access-log
+    ports:
+      - "7890:7890"
+    environment:
+      ACCESS_LOG_PATH: /var/log/traefik/access.log
+      WS_URL: ${WS_URL:-access.creco.dev}
+      GOACCESS_EXTRA_ARGS: ${GOACCESS_EXTRA_ARGS:-}
+    volumes:
+      - traefik_logs:/var/log/traefik:ro
+      - goaccess_data:/var/www/goaccess
+      - goaccess_db:/tmp/goaccess-db
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.goaccess.rule=Host(`access.creco.dev`)"
+      - "traefik.http.routers.goaccess.entrypoints=websecure"
+      - "traefik.http.routers.goaccess.tls.certresolver=letsencrypt"
+      - "traefik.http.services.goaccess.loadbalancer.server.port=7890"
+
+volumes:
+  traefik_logs:
+    external: true
+    name: ${TRAEFIK_LOG_VOLUME:-dokploy-traefik-logs}
+  goaccess_data:
+    driver: local
+  goaccess_db:
+    driver: local
