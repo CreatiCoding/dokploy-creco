@@ -334,6 +334,22 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Failed to read logs', detail: err.message }));
     }
+  } else if (path === '/api/debug') {
+    if (!isAuthenticated(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+    try {
+      const data = fs.readFileSync(LOG_FILE, 'utf8');
+      const lines = data.split('\n').filter(l => l.trim()).slice(0, 5);
+      const parsed = lines.map(l => ({ raw: l, parsed: parseLogLine(l) }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ logFile: LOG_FILE, sampleLines: parsed }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message, logFile: LOG_FILE }));
+    }
   } else if (path === '/api/stats') {
     if (!isAuthenticated(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
