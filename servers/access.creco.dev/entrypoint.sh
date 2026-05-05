@@ -5,7 +5,6 @@ mkdir -p /var/www/goaccess /tmp/goaccess-db
 
 LOG_FILE="${ACCESS_LOG_PATH:-/var/log/traefik/access.log}"
 
-# Ensure log file exists
 if [ ! -f "$LOG_FILE" ]; then
   LOG_FILE="/tmp/access.log"
 fi
@@ -14,9 +13,13 @@ if [ ! -s "$LOG_FILE" ]; then
   echo '127.0.0.1 - - [01/Jan/2024:00:00:00 +0000] "GET /health HTTP/1.1" 200 0 "-" "healthcheck"' > "$LOG_FILE"
 fi
 
-echo "Using log file: $LOG_FILE ($(wc -l < "$LOG_FILE") lines)"
+echo "Log: $LOG_FILE ($(wc -l < "$LOG_FILE") lines)"
 
-# Start GoAccess real-time (WebSocket on 7890, generates HTML)
+# Start auth server
+node /app/auth-server.js &
+echo "Auth server started"
+
+# Start GoAccess
 goaccess "$LOG_FILE" \
   --real-time-html \
   --port=7890 \
@@ -26,7 +29,7 @@ goaccess "$LOG_FILE" \
   --anonymize-ip &
 
 sleep 2
-echo "GoAccess started, report at /var/www/goaccess/index.html"
+echo "GoAccess started"
 
-# Start nginx (serves HTML on 80, proxies /ws to GoAccess 7890)
+# Start nginx
 exec nginx -g "daemon off;"

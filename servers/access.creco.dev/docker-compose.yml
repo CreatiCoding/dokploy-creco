@@ -8,6 +8,9 @@ services:
       - dokploy-network
     environment:
       ACCESS_LOG_PATH: /var/log/traefik/access.log
+      AUTH_USER: ${AUTH_USER:-admin}
+      AUTH_PASS: ${AUTH_PASS}
+      AUTH_SECRET: ${AUTH_SECRET}
     volumes:
       - /etc/dokploy/traefik:/var/log/traefik:ro
     restart: unless-stopped
