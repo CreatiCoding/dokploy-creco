@@ -12,22 +12,34 @@ services:
       GOACCESS_EXTRA_ARGS: ${GOACCESS_EXTRA_ARGS:-}
     volumes:
       - /etc/dokploy/traefik:/var/log/traefik:ro
-      - goaccess_data:/var/www/goaccess
+      - goaccess_html:/var/www/goaccess
       - goaccess_db:/tmp/goaccess-db
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: goaccess-nginx
+    networks:
+      - dokploy-network
+    volumes:
+      - goaccess_html:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - goaccess
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.goaccess.rule=Host(`access.creco.dev`)"
       - "traefik.http.routers.goaccess.entrypoints=websecure"
       - "traefik.http.routers.goaccess.tls.certresolver=letsencrypt"
-      - "traefik.http.services.goaccess.loadbalancer.server.port=7890"
+      - "traefik.http.services.goaccess.loadbalancer.server.port=80"
 
 networks:
   dokploy-network:
     external: true
 
 volumes:
-  goaccess_data:
+  goaccess_html:
     driver: local
   goaccess_db:
     driver: local
