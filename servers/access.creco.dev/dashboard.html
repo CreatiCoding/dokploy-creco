@@ -277,12 +277,23 @@
   </div>
 
   <script>
-    let currentPage = 1;
-    let perPage = 100;
-    let searchQuery = '';
-    let statusFilter = '';
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentPage = parseInt(urlParams.get('page')) || 1;
+    let perPage = parseInt(urlParams.get('perPage')) || 100;
+    let searchQuery = urlParams.get('q') || '';
+    let statusFilter = urlParams.get('status') || '';
     let autoRefreshInterval = null;
     let totalPages = 1;
+
+    function syncURL() {
+      const p = new URLSearchParams();
+      if (searchQuery) p.set('q', searchQuery);
+      if (statusFilter) p.set('status', statusFilter);
+      if (currentPage > 1) p.set('page', currentPage);
+      if (perPage !== 100) p.set('perPage', perPage);
+      const qs = p.toString();
+      history.replaceState(null, '', qs ? '?' + qs : '/');
+    }
 
     const logBody = document.getElementById('logBody');
     const loadingEl = document.getElementById('loading');
@@ -315,6 +326,7 @@
     }
 
     async function fetchLogs() {
+      syncURL();
       loadingEl.style.display = 'block';
       emptyEl.style.display = 'none';
       logBody.innerHTML = '';
@@ -428,8 +440,13 @@
       }
     });
 
-    // Initial load
-    document.getElementById('filterAll').classList.add('active');
+    // Initial load - restore state from URL
+    searchInput.value = searchQuery;
+    perPageSelect.value = perPage;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+      if (b.dataset.status === statusFilter) b.classList.add('active');
+    });
+    if (!statusFilter) document.getElementById('filterAll').classList.add('active');
     fetchLogs();
     fetchStats();
   </script>
