@@ -110,25 +110,19 @@ function buildAST(tokens) {
   }
   function parseAnd() {
     let left = parseNot();
-    while (pos < tokens.length && (tokens[pos].type === 'and' ||
-      (tokens[pos].type !== 'or' && tokens[pos].type !== 'rparen' && tokens[pos].type === 'value' && isFieldOrFreetext()))) {
-      if (tokens[pos].type === 'and') pos++;
-      const right = parseNot();
-      left = { type: 'and', left, right };
-    }
-    return left;
-  }
-  function isFieldOrFreetext() {
-    // Implicit AND: next token starts a new expression
-    return true;
-  }
-  function parseAnd() {
-    let left = parseNot();
     while (pos < tokens.length) {
       if (tokens[pos].type === 'or' || tokens[pos].type === 'rparen') break;
-      if (tokens[pos].type === 'and') { pos++; }
-      const right = parseNot();
-      left = { type: 'and', left, right };
+      if (tokens[pos].type === 'and') {
+        pos++;
+        const right = parseNot();
+        left = { type: 'and', left, right };
+      } else if (tokens[pos].type === 'value' || tokens[pos].type === 'not' || tokens[pos].type === 'lparen') {
+        // Implicit AND
+        const right = parseNot();
+        left = { type: 'and', left, right };
+      } else {
+        break;
+      }
     }
     return left;
   }
