@@ -11,6 +11,9 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 COPY auth-server.js /app/auth-server.js
 COPY login.html /var/www/auth/login.html
 
+# Custom dashboard
+COPY dashboard.html /var/www/goaccess/dashboard.html
+
 # Entry script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

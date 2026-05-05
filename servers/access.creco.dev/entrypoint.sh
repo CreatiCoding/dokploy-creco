@@ -19,12 +19,12 @@ echo "Log: $LOG_FILE ($(wc -l < "$LOG_FILE") lines)"
 node /app/auth-server.js &
 echo "Auth server started"
 
-# Start GoAccess
+# Start GoAccess (output to report.html so dashboard.html can be root)
 goaccess "$LOG_FILE" \
   --real-time-html \
   --port=7890 \
   --ws-url=access.creco.dev:443/ws \
-  --output=/var/www/goaccess/index.html \
+  --output=/var/www/goaccess/report.html \
   --log-format=COMBINED \
   --anonymize-ip &
 

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Access Log Dashboard - access.creco.dev</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Courier New', monospace;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    .header {
+      background: #16213e;
+      border-bottom: 1px solid #2a2a4a;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 {
+      font-size: 1.2rem;
+      color: #fff;
+      font-weight: 600;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-right a {
+      color: #888;
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .header-right a:hover {
+      color: #fff;
+      background: #2a2a4a;
+    }
+    .controls {
+      background: #16213e;
+      padding: 16px 24px;
+      border-bottom: 1px solid #2a2a4a;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 10px 16px 10px 36px;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      background: #0f0f23;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-box input:focus { border-color: #4a9eff; }
+    .search-box::before {
+      content: "\1F50D";
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85rem;
+    }
+    .filter-btn {
+      padding: 10px 16px;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      background: #0f0f23;
+      color: #aaa;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover { border-color: #4a9eff; color: #fff; }
+    .filter-btn.active { border-color: #4a9eff; color: #4a9eff; background: rgba(74, 158, 255, 0.1); }
+    .auto-refresh {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+    .auto-refresh input[type="checkbox"] {
+      accent-color: #4a9eff;
+    }
+    .stats-bar {
+      padding: 10px 24px;
+      background: #0f0f23;
+      border-bottom: 1px solid #2a2a4a;
+      display: flex;
+      gap: 24px;
+      font-size: 0.8rem;
+      color: #888;
+    }
+    .stats-bar span { display: flex; align-items: center; gap: 4px; }
+    .stats-bar .count { color: #4a9eff; font-weight: 600; }
+    .table-container {
+      overflow-x: auto;
+      padding: 0 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead th {
+      background: #16213e;
+      padding: 12px 16px;
+      text-align: left;
+      color: #888;
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #2a2a4a;
+      position: sticky;
+      top: 65px;
+      z-index: 50;
+    }
+    tbody tr {
+      border-bottom: 1px solid #1e1e3a;
+      transition: background 0.1s;
+    }
+    tbody tr:hover { background: rgba(74, 158, 255, 0.05); }
+    tbody td {
+      padding: 10px 16px;
+      white-space: nowrap;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .col-time { color: #888; font-family: 'Courier New', monospace; font-size: 0.8rem; }
+    .col-ip { color: #c792ea; }
+    .col-method { font-weight: 600; }
+    .col-method.GET { color: #82aaff; }
+    .col-method.POST { color: #c3e88d; }
+    .col-method.PUT { color: #ffcb6b; }
+    .col-method.DELETE { color: #ff5370; }
+    .col-method.PATCH { color: #f78c6c; }
+    .col-path { color: #e0e0e0; }
+    .col-status { font-weight: 600; font-family: 'Courier New', monospace; }
+    .col-status.s2xx { color: #c3e88d; }
+    .col-status.s3xx { color: #ffcb6b; }
+    .col-status.s4xx { color: #f78c6c; }
+    .col-status.s5xx { color: #ff5370; }
+    .col-ua { color: #666; font-size: 0.8rem; max-width: 300px; }
+    .pagination {
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .pagination button {
+      padding: 8px 14px;
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      background: #16213e;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .pagination button:hover:not(:disabled) { border-color: #4a9eff; color: #4a9eff; }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination .page-info { color: #888; font-size: 0.85rem; padding: 0 12px; }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #888;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #2a2a4a;
+      border-top-color: #4a9eff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    .empty p { font-size: 1.1rem; margin-bottom: 8px; }
+    .per-page-select {
+      padding: 8px 12px;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      background: #0f0f23;
+      color: #aaa;
+      font-size: 0.85rem;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Access Log Dashboard</h1>
+    <div class="header-right">
+      <a href="/goaccess">GoAccess Report</a>
+      <a href="/logout">Logout</a>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search by IP, path, user agent, method, status...">
+    </div>
+    <button class="filter-btn" data-status="" id="filterAll">All</button>
+    <button class="filter-btn" data-status="2xx">2xx</button>
+    <button class="filter-btn" data-status="3xx">3xx</button>
+    <button class="filter-btn" data-status="4xx">4xx</button>
+    <button class="filter-btn" data-status="5xx">5xx</button>
+    <select class="per-page-select" id="perPageSelect">
+      <option value="50">50/page</option>
+      <option value="100" selected>100/page</option>
+      <option value="200">200/page</option>
+      <option value="500">500/page</option>
+    </select>
+    <label class="auto-refresh">
+      <input type="checkbox" id="autoRefresh"> Auto-refresh (10s)
+    </label>
+  </div>
+  <div class="stats-bar">
+    <span>Total: <span class="count" id="totalCount">-</span></span>
+    <span>Showing: <span class="count" id="showingCount">-</span></span>
+    <span>File: <span class="count" id="fileSize">-</span></span>
+    <span>Last update: <span class="count" id="lastUpdate">-</span></span>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>IP</th>
+          <th>Method</th>
+          <th>Path</th>
+          <th>Status</th>
+          <th>Size</th>
+          <th>User Agent</th>
+        </tr>
+      </thead>
+      <tbody id="logBody">
+      </tbody>
+    </table>
+  </div>
+  <div id="loading" class="loading" style="display:none;">
+    <span class="spinner"></span> Loading logs...
+  </div>
+  <div id="empty" class="empty" style="display:none;">
+    <p>No log entries found</p>
+    <span>Try adjusting your search or filters</span>
+  </div>
+  <div class="pagination">
+    <button id="prevBtn" disabled>&laquo; Previous</button>
+    <span class="page-info" id="pageInfo">Page 1</span>
+    <button id="nextBtn" disabled>Next &raquo;</button>
+  </div>
+
+  <script>
+    let currentPage = 1;
+    let perPage = 100;
+    let searchQuery = '';
+    let statusFilter = '';
+    let autoRefreshInterval = null;
+    let totalPages = 1;
+
+    const logBody = document.getElementById('logBody');
+    const loadingEl = document.getElementById('loading');
+    const emptyEl = document.getElementById('empty');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const pageInfo = document.getElementById('pageInfo');
+    const searchInput = document.getElementById('searchInput');
+    const autoRefreshCheckbox = document.getElementById('autoRefresh');
+    const perPageSelect = document.getElementById('perPageSelect');
+
+    function formatSize(bytes) {
+      if (bytes === 0) return '-';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function statusClass(code) {
+      if (code >= 200 && code < 300) return 's2xx';
+      if (code >= 300 && code < 400) return 's3xx';
+      if (code >= 400 && code < 500) return 's4xx';
+      return 's5xx';
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function fetchLogs() {
+      loadingEl.style.display = 'block';
+      emptyEl.style.display = 'none';
+      logBody.innerHTML = '';
+
+      const params = new URLSearchParams({
+        page: currentPage,
+        perPage: perPage,
+        search: searchQuery,
+        status: statusFilter
+      });
+
+      try {
+        const res = await fetch('/api/logs?' + params.toString());
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        const data = await res.json();
+        loadingEl.style.display = 'none';
+
+        document.getElementById('totalCount').textContent = data.total.toLocaleString();
+        document.getElementById('showingCount').textContent = data.logs.length.toLocaleString();
+
+        totalPages = Math.ceil(data.total / perPage) || 1;
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        prevBtn.disabled = currentPage <= 1;
+        nextBtn.disabled = currentPage >= totalPages;
+
+        if (data.logs.length === 0) {
+          emptyEl.style.display = 'block';
+          return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        data.logs.forEach(log => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="col-time">${escapeHtml(log.time)}</td>
+            <td class="col-ip">${escapeHtml(log.ip)}</td>
+            <td class="col-method ${log.method}">${escapeHtml(log.method)}</td>
+            <td class="col-path" title="${escapeHtml(log.path)}">${escapeHtml(log.path)}</td>
+            <td class="col-status ${statusClass(log.status)}">${log.status}</td>
+            <td>${formatSize(log.size)}</td>
+            <td class="col-ua" title="${escapeHtml(log.userAgent)}">${escapeHtml(log.userAgent)}</td>
+          `;
+          fragment.appendChild(tr);
+        });
+        logBody.appendChild(fragment);
+      } catch (err) {
+        loadingEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        emptyEl.querySelector('p').textContent = 'Error loading logs';
+        emptyEl.querySelector('span').textContent = err.message;
+      }
+    }
+
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('fileSize').textContent = formatSize(data.fileSize);
+          document.getElementById('lastUpdate').textContent = data.lastModified
+            ? new Date(data.lastModified).toLocaleString()
+            : '-';
+        }
+      } catch {}
+    }
+
+    // Event listeners
+    let searchTimeout;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchQuery = searchInput.value.trim();
+        currentPage = 1;
+        fetchLogs();
+      }, 300);
+    });
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        statusFilter = btn.dataset.status;
+        currentPage = 1;
+        fetchLogs();
+      });
+    });
+
+    perPageSelect.addEventListener('change', () => {
+      perPage = parseInt(perPageSelect.value);
+      currentPage = 1;
+      fetchLogs();
+    });
+
+    prevBtn.addEventListener('click', () => {
+      if (currentPage > 1) { currentPage--; fetchLogs(); }
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentPage < totalPages) { currentPage++; fetchLogs(); }
+    });
+
+    autoRefreshCheckbox.addEventListener('change', () => {
+      if (autoRefreshCheckbox.checked) {
+        autoRefreshInterval = setInterval(() => { fetchLogs(); fetchStats(); }, 10000);
+      } else {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+      }
+    });
+
+    // Initial load
+    document.getElementById('filterAll').classList.add('active');
+    fetchLogs();
+    fetchStats();
+  </script>
+</body>
+</html>
