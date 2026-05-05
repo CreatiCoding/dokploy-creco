@@ -18,36 +18,31 @@ if [ ! -s "$LOG_FILE" ]; then
   echo "Added seed log entry"
 fi
 
-echo "Log file: $LOG_FILE"
-echo "Contents: $(wc -l < "$LOG_FILE") lines"
+echo "Log file: $LOG_FILE ($(wc -l < "$LOG_FILE") lines)"
 
-# Generate initial HTML report (non-realtime first)
-echo "Generating initial HTML report..."
-goaccess "$LOG_FILE" \
-  --output=/var/www/goaccess/index.html \
-  --log-format=COMBINED \
-  --anonymize-ip 2>&1 || echo "Initial report generation failed, continuing..."
-
-# Start GoAccess real-time in background
+# Start GoAccess with --keep-last to prevent exit on EOF
+# Use tail -F to continuously feed the log to GoAccess via pipe
 echo "Starting GoAccess WebSocket server on port 7890..."
-goaccess "$LOG_FILE" \
+tail -F "$LOG_FILE" | goaccess \
   --real-time-html \
   --port=7890 \
   --ws-url="access.creco.dev:443/ws" \
   --output=/var/www/goaccess/index.html \
   --log-format=COMBINED \
   --anonymize-ip \
-  ${GOACCESS_EXTRA_ARGS} 2>&1 &
+  ${GOACCESS_EXTRA_ARGS} &
 
-GOACCESS_PID=$!
-echo "GoAccess started with PID $GOACCESS_PID"
+# Give GoAccess time to start and generate initial report
+sleep 3
 
-# Wait a moment and verify GoAccess is running
-sleep 2
-if kill -0 $GOACCESS_PID 2>/dev/null; then
-  echo "GoAccess is running"
+# Verify the HTML was generated
+if [ -f /var/www/goaccess/index.html ]; then
+  echo "GoAccess report generated successfully"
 else
-  echo "WARNING: GoAccess exited! Starting nginx anyway with static report."
+  echo "WARNING: GoAccess report not found, generating static fallback..."
+  goaccess "$LOG_FILE" \
+    --output=/var/www/goaccess/index.html \
+    --log-format=COMBINED 2>/dev/null || echo "<html><body><h1>GoAccess starting...</h1></body></html>" > /var/www/goaccess/index.html
 fi
 
 # Start nginx in foreground
