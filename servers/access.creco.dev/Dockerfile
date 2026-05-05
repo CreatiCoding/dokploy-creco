@@ -1,10 +1,10 @@
+FROM allinurl/goaccess:latest AS goaccess-bin
+
 FROM nginx:alpine
 
-# Install GoAccess from Alpine packages
-RUN apk add --no-cache goaccess
-
-# GoAccess configuration
-COPY goaccess.conf /etc/goaccess/goaccess.conf
+# Copy GoAccess binary and its dependencies from official image
+COPY --from=goaccess-bin /goaccess /goaccess
+COPY --from=goaccess-bin /usr/local/share/GeoIP /usr/local/share/GeoIP
 
 # Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
@@ -13,7 +13,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Create directories
+# Create necessary directories
 RUN mkdir -p /var/www/goaccess /tmp/goaccess-db
 
 EXPOSE 80
